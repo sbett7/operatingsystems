@@ -12,4 +12,10 @@ After connecting to server
 	2 - GAME_WON 	- 	Won the game
 
 
-8. Leaderboard hasn't been implemented yet.
+8. User sends 2 when asked for a command
+9. server will send a uint16_t that contains the number of clients on the leaderboard.
+10. server sends the size of the username (sizeof(char *username)).  
+11. server sends the username
+12. server sends the number of games played
+12. server sends the number of games won
+13. server repeats 10-12 until the number provided by 9. is met.

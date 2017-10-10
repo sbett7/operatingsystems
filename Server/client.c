@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
+#define STRING_SIZE 150
 
 #define ARRAY_SIZE 30
 
@@ -31,18 +32,11 @@
 void Send_Array_Data(int socket_id, int command) {
 
 	uint16_t item = 0;	
-	/*	
-	for (i = 0; i < ARRAY_SIZE; i++) {
-		item = htonl(myArray[i]);
-		send(socket_id, &item, sizeof(uint32_t), 0);
-		printf("Array[%d] = %d\n", i, myArray[i]);		
-	}
-	*/
-	//fflush(stdout);
+
 	item = htons(command);
 	send(socket_id, &item, sizeof(uint16_t), 0);
 	
-	//fflush(stdout);
+
 }
 
 void receiveWordInformation(int socketId, int wordInformation[3]){
@@ -50,10 +44,44 @@ void receiveWordInformation(int socketId, int wordInformation[3]){
 	int retValue;
 	printf("got here\n");
 
-	//printf("%d",recv(socketId, &value, sizeof(uint16_t), 0));
+
 	for(int i = 0; i < 3; i++){
 		recv(socketId, &value, sizeof(uint16_t), 0);
 		wordInformation[i] = ntohs(value);
+	}
+}
+
+void receivePrintLeaderboard(int socketId){
+	uint16_t value;
+	int numClients;
+	char username[STRING_SIZE];
+	int retval;
+	int gamesWon;
+	int gamesPlayed;
+	int charSize = 0;
+	
+	recv(socketId, &value, sizeof(uint16_t), 0);
+	numClients = ntohs(value);
+
+	if(numClients == 0){
+		printf("No Entries in Leaderboard\n");
+	}else{
+		printf("Number of Clients in Leaderboard: %d\n", numClients);
+		for (int i = 0; i < numClients; i++){
+			recv(socketId, &value, sizeof(uint16_t), 0);
+			charSize = ntohs(value);
+
+			recv(socketId, &username, charSize, 0);
+
+			recv(socketId, &value, sizeof(uint16_t), 0);
+			gamesPlayed = ntohs(value);
+
+			recv(socketId, &value, sizeof(uint16_t), 0);
+
+			gamesWon = ntohs(value);
+
+			printf("Player - %s\nGames Played - %d\nGames Won - %d\n\n", username, gamesPlayed, gamesWon);
+		}
 	}
 }
 
@@ -186,11 +214,14 @@ int main(int argc, char *argv[]) {
 	scanf("%s", password);
 	send(sockfd, &username, MAXDATASIZE, 0);
 	send(sockfd, &password, MAXDATASIZE, 0);
-	if (!getAuthorisationResult(sockfd)){
+
+	int authorisation = getAuthorisationResult(sockfd);
+	if (!authorisation){
 		printf("failed to authorise\n");
 	}
 	
-	while(value != 3){
+	
+	while(value != 3 && authorisation){
 		printf("please give a command: ");
 		scanf("%d", &value);
 		printf("command given was: %d\n",value);
@@ -213,7 +244,6 @@ int main(int argc, char *argv[]) {
 			initWord(word, wordInformation[FIRST_LENGTH], length);
 			
 			while(currentGuesses != wordInformation[MAX_GUESSES] && !checkWordIsDone(word, length)){
-				//sendGameStatus(sockfd, GAME_CONTINUE);
 				printf("The word is done: %d\n",checkWordIsDone(word, length));
 				char guess;
 				printf("enter your guess: ");	
@@ -243,33 +273,10 @@ int main(int argc, char *argv[]) {
 			free(wordPosition);
 			free(guessedLetters);
 			
-		}
-		
-		//fflush(stdout);
-		
+		} else if (value == 2){
+			receivePrintLeaderboard(sockfd);
+		}		
 	}
-
-	/* Create an array of squares of first 30 whole numbers */
-	/*int simpleArray[ARRAY_SIZE] = {0};
-	for (i = 0; i < ARRAY_SIZE; i++) {
-		simpleArray[i] = i * i;
-	}
-
-	*/
-
-	/* Receive message back from server */
-	/*
-	if ((numbytes=recv(sockfd, buf, MAXDATASIZE, 0)) == -1) {
-		perror("recv");
-		exit(1);
-	}
-	*/
-	/*
-	buf[numbytes] = '\0';
-
-	printf("Received: %s",buf);
-
-	*/
 	close(sockfd);
 
 	return 0;

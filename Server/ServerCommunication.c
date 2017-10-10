@@ -1,17 +1,13 @@
-#include <arpa/inet.h>
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <errno.h> 
-#include <string.h> 
-#include <sys/types.h> 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
-#include <sys/wait.h> 
-#include <unistd.h>
-#include <pthread.h>
-
+#define _GNU_SOURCE
 #include "TextProcessor.h"
 
+#include <stdio.h>       /* standard I/O routines                     */
+#include <pthread.h>     /* pthread functions and data structures     */
+#include <stdlib.h>      /* rand() and srand() functions              */
+#include <time.h>
+#include <unistd.h>
+
+#define NUM_OF_CONNECTIONS 10
 #define BACKLOG 10
 
 #define HANGMAN 	1
@@ -24,24 +20,38 @@
 
 #define MAX_DATA_SIZE 100
 
-/*
-void *clientHandler(void *socketDesc){
-	int socket = *(int*)socketDesc;
-}
-
-*/
-
 int numWords;
+int numAccounts;
+
+pthread_t  clientThreads[NUM_OF_CONNECTIONS];
+
+pthread_mutex_t connectionMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_cond_t  gotConnection   = PTHREAD_COND_INITIALIZER;
+
+struct connection{
+	int socketId;
+	struct connection* next;
+};
+
+//pthread_mutex_t connectionMutex;
+//pthread_cond_t gotConnection;
+
+int numConnections = 0;
+int rc;
+
+struct connection *connections = NULL;
+struct connection *lastConnection = NULL;
+
 
 void getUserCredentials(int socketId, char *user, char *password){
-	printf("got here\n");
 	int numBytes = recv(socketId, user, MAX_DATA_SIZE, 0);
 
 	user[numBytes] = '\0';
-	printf("got here\n");
+
 	numBytes = recv(socketId, password, MAX_DATA_SIZE, 0);
 	
 	password[numBytes] = '\0';
+	printf("%s, %s\n", user, password);
 }
 
 void sendAuthenticationResult(int socketId, int authenticationResult){
@@ -52,10 +62,8 @@ void sendAuthenticationResult(int socketId, int authenticationResult){
 int getCommand(int socketIdentifier){
 	int command = 0;
 	uint16_t value = 0;
-	int retValue = 0;
-	//printf("got to read value\n");
 
-	retValue = recv(socketIdentifier, &value, sizeof(uint16_t), 0);
+	recv(socketIdentifier, &value, sizeof(uint16_t), 0);
 	command = ntohs(value);
 	return command;
 }
@@ -69,7 +77,6 @@ void sendWordLength(int socketId, int wordDetails[3]){
 		if(send(socketId, &item, sizeof(uint16_t), 0) < 0){
 			printf("error\n");
 		}
-		//printf("%d\n", send(socketId, &item, sizeof(uint16_t), 0));
 	}
 }
 
@@ -102,94 +109,194 @@ void sendLetterPositions(int socketId, Client *client){
 int getGameStatus(int socketId){
 	int status = -1;
 	uint16_t value = 0;
-	int retValue = 0;
 	//printf("got to read value\n");
 
 	while(status != GAME_CONTINUE || status != GAME_WON || status != GAME_LOST){
-		retValue = recv(socketId, &value, sizeof(uint16_t), 0);
+		recv(socketId, &value, sizeof(uint16_t), 0);
 	
 		status = ntohs(value);
 	}
 	return status;
 }
 
-void performCommand(int command, int socketId, Client *client){
+void hangmanGame(int socketId, Client *client){
 	int *wordInformation = malloc(3 * sizeof(int));
 	char guess;
-	int status = GAME_CONTINUE;
-	printf("got here");
-	initialiseClientWords(client, numWords);
-	//printf("%d, %d\n", client->firstLength, client->lastLength);
-	printf("%s %s\n", words[client->wordId].firstWord, words[client->wordId].lastWord);
 
+	initialiseClientWords(client, numWords);
 	wordInformation[0] = words[client->wordId].firstLength;
 	wordInformation[1] = words[client->wordId].lastLength;
 	wordInformation[2] = words[client->wordId].maxGuess;
-
-	switch(command){
-		case HANGMAN:			
-			printf("requested game\n");
-			client->gamesPlayed++;
-			sendWordLength(socketId, wordInformation);
-			
-			while(1){
-				guess = getClientGuess(socketId);
-				if(guess <= 'z' && guess >= 'a'){
-					getLetterLocations(client, guess);
-					sendLetterPositions(socketId, client);
-					resetLetterLocations(client);
-					wordInformation[2]--;
-					printf("Guess: %c\nNumber of guesses remaining: %d\n", guess, wordInformation[2]);
-				} else if (guess == GAME_WON || guess == GAME_LOST){
-					break;
-				}
-			}
-			printf("fininshed game\n");
-			if(guess == GAME_WON){
-				client->gamesWon++;
-				printf("%s has won: %d\n%s has played: %d\n",client->username, client->gamesWon,client->username, client->gamesPlayed);
-				printf("\nGame Completed with player winning\n");
-			} else {
-				printf("%s has won: %d\n%s has played: %d\n",client->username, client->gamesWon,client->username, client->gamesPlayed);
-				printf("\nGame Completed with player losing\n");
-			}
+	client->gamesPlayed++;
+	sendWordLength(socketId, wordInformation);
+	printf("%s", client->username);
+	
+	while(1){
+		guess = getClientGuess(socketId);
+		if(guess <= 'z' && guess >= 'a'){
+			getLetterLocations(client, guess);
+			sendLetterPositions(socketId, client);
+			resetLetterLocations(client);
+			wordInformation[2]--;
+		} else if (guess == GAME_WON || guess == GAME_LOST){
 			break;
-		case LEADERBOARD:
-			printf("requested leaderboard\n");
-			break;
-		case EXIT:
-			printf("Client is disconnecting\n");
-			close(socketId);
-			exit(0);
-			break;
+		}
 	}
+	if(guess == GAME_WON){
+		client->gamesWon++;
+	}
+	printf("got to locking\n");
+	leaderboardWriteLock();
+	printf("got to updation\n");
+	printf("%s, %d, %d\n", client->username, client->gamesPlayed, client->gamesWon);
+	updateLeaderboardWithClient(client);
+	printf("got to unlocking\n");
+	leaderboardWriteUnlock();
+
 	free(wordInformation);
 }
 
-void HangmanFunction(void* socketId){
-	int sockFd = *(int*) socketId;
-	int command = HANGMAN;
+void performCommand(int command, int socketId, Client *client){
+	switch(command){
+		case HANGMAN:			
+			hangmanGame(socketId, client);
+			break;
+		case LEADERBOARD:
+			leaderboardReadLock();
+			sendClientLeaderboard(socketId);
+			leaderboardReadUnlock();
+
+			break;
+		case EXIT:
+			printf("closing connection");
+			close(socketId);
+			break;
+	}
+}
+
+void addConnection(int socketId, pthread_mutex_t *pMutex, pthread_cond_t *pCondVar){
+	struct connection *clientConnection;
+
+	clientConnection = (struct connection*)malloc(sizeof(struct connection));
+
+	if(!clientConnection){
+		fprintf(stderr, "AddConnection: out of memory\n");
+		exit(1);
+	}
+
+	clientConnection->socketId = socketId;
+	clientConnection->next = NULL;
+	
+	rc = pthread_mutex_lock(pMutex);
+	
+	if(numConnections == NO_PENDING_CONNECTIONS){
+		connections = clientConnection;
+		lastConnection = clientConnection;
+	} else{
+		lastConnection->next = clientConnection;
+		lastConnection = clientConnection;
+	}
+	numConnections++;
+
+	rc = pthread_mutex_unlock(pMutex);
+	rc = pthread_cond_signal(pCondVar);
+	
+}
+
+struct connection* getConnection(pthread_mutex_t *pMutex){
+	struct connection *clientConnection;
+	
+	rc = pthread_mutex_lock(pMutex);
+	
+	if(numConnections > 0){
+		clientConnection = connections;
+		connections = clientConnection->next;
+		if(connections == NULL){
+			lastConnection = NULL;
+		}
+		numConnections--;
+		
+	} else{
+
+		clientConnection = NULL;
+	}
+
+	rc = pthread_mutex_unlock(pMutex);
+	return clientConnection;
+}
+
+void handleConnection(int socketId){
+	int command = 0;
 	int accountVerified;
 	char *username = malloc(MAX_DATA_SIZE * sizeof(char));
 	char *password = malloc(MAX_DATA_SIZE * sizeof(char));
-	getUserCredentials(sockFd, username, password);	
-	accountVerified = readCredentials(username, password);
-	sendAuthenticationResult(sockFd, accountVerified);
-	if(accountVerified){
-		Client client;
-		client.clientId = sockFd;
-		initialiseClient(sockFd, &client, username);
-	
-	
-		while (command != EXIT){
-			command = getCommand(sockFd);
-			performCommand(HANGMAN, sockFd, &client);
+	int clientIndex = 0;
+	getUserCredentials(socketId, username, password);
+	printf("num accounts: %d\n", numAccounts);
+	accountVerified = checkCredentials(username, password, numAccounts);
+
+	printf("Account Verified: %d\n", accountVerified);
+
+	sendAuthenticationResult(socketId, accountVerified);
+	if(accountVerified == TRUE){
+
+		clientIndex = getClientIndexByUsername(username);
+		//printf("%d\n",clientIndex);
+		if(clientIndex == -1){
+			clientIndex = addClient(username);
+			printf("Client Index: %d\n", clientIndex);
 		}
-	} else{
 		
+		while (command != EXIT){
+			command = getCommand(socketId);
+			//printf("command received was: %d\n", command);
+			performCommand(command, socketId, &clients[clientIndex]);
+		}
+		free(username);
+		free(password);
+	} else{
+		printf("User was not verified, closing connection");
+		close(socketId);
 	}
+}
+
+void* threadConnectionHandler(){
+	struct connection *clientConnection;
+	rc = pthread_mutex_lock(&connectionMutex);	
 	
-	
+	while(1){
+		if(numConnections > 0){
+			clientConnection = getConnection(&connectionMutex);
+
+			if(clientConnection){
+				rc = pthread_mutex_unlock(&connectionMutex);
+				handleConnection(clientConnection->socketId);
+				close(clientConnection->socketId);
+				free(clientConnection);
+				rc = pthread_mutex_lock(&connectionMutex);
+
+			}
+		} else{
+			rc = pthread_cond_wait(&gotConnection, &connectionMutex);
+		}
+	}
+}
+
+void clearThreads(){
+	for (int i = 0; i < NUM_OF_CONNECTIONS; i++){
+		pthread_exit(&clientThreads[i]);
+	}
+}
+
+void endProgramHandler() {
+	clearWords();
+	clearThreads();
+}
+
+void createThreads(){ 	
+	for(int i = 0; i < NUM_OF_CONNECTIONS; i++){
+		pthread_create(&clientThreads[i], NULL, threadConnectionHandler, NULL);
+	}
 }
 
 int main(int argc, char *argv[]){
@@ -197,12 +304,21 @@ int main(int argc, char *argv[]){
 	struct sockaddr_in serverAddress;
 	struct sockaddr_in clientAddress;
 	socklen_t sin_size;
+	signal(SIGINT, endProgramHandler);
 
-	pthread_t client_thread;
+	//initialiseMutexConnections();
+	initialiseLeaderboardMutex();
 
 	numWords = getTextFileLength(HANGMAN_FILE);
+
+	//subtract 1 to disclude header
+	numAccounts = getTextFileLength(ACCOUNTS_FILE) - 1;
 	words = malloc(numWords * sizeof(Word));
-	
+	accounts = malloc(numAccounts * sizeof(Account));
+	clients = malloc(sizeof(Client));
+	numClients = 0;
+
+	storeCredentials();
 	readInWords();
 
 	if (argc != 2) {
@@ -232,6 +348,8 @@ int main(int argc, char *argv[]){
 
 	printf("server has begun listening\n");
 
+	createThreads();
+
 	while(1){
 		sin_size = sizeof(struct sockaddr_in);
 		if ((newFd = accept(sockFd, (struct sockaddr *)&clientAddress, \
@@ -242,17 +360,19 @@ int main(int argc, char *argv[]){
 		printf("server: got connection from %s\n", \
 			inet_ntoa(clientAddress.sin_addr));
 		
+		addConnection(newFd, &connectionMutex, &gotConnection);
 
-
+		/*
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
 		pthread_create(&client_thread, NULL, (void*)HangmanFunction, (void*)&newFd);
-
+		*/
 		
-		pthread_join(client_thread, NULL);
+			
+		//pthread_join(client_thread, NULL);
 		//close(newFd);  /* parent doesn't need this */
 
-		while(waitpid(-1,NULL,WNOHANG) > 0); /* clean up child processes */
+		//while(waitpid(-1,NULL,WNOHANG) > 0); /* clean up child processes */
 		
 	}
 }

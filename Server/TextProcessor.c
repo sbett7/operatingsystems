@@ -2,12 +2,12 @@
 #include "TextProcessor.h"
 
 /*
-void initialiseMutexConnections(){
-	pthread_mutex_init(&connectionMutex, PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP);
-	pthread_cond_init(&gotConnection, PTHREAD_COND_INITIALIZER);
-}
+This function gets the length of the file that has had its name given
+	as a parameter.
+char *fileName: a pointer to a char array that contains the name of the
+	file that is to be opened.
+Returns: An integer that contains the length of the file.
 */
-
 int getTextFileLength(char *fileName){
 	FILE *fp = fopen(fileName, "r");
 	int lines = 0;
@@ -24,6 +24,12 @@ int getTextFileLength(char *fileName){
 	return lines;
 }
 
+/*
+This function finds the length of the char array.
+char *word: a pointer to a char array that contains word that
+	is to be measured.
+Returns: An integer that contains the length of the char array.
+*/
 int getWordLength(char* word){
 	for(int i = 0; i < MAX_LINE; i++){
 		if(word[i] == '\0'){
@@ -33,17 +39,40 @@ int getWordLength(char* word){
 	return 0;
 }
 
+/*
+This function finds the length of the char array.
+char *word: a pointer to a char array that is to be used to copy the original word.
+char *original: a pointer to a char array that contains the word that is
+	to be copied.
+int length: An integer that specifies the length of the word to copy.
+Returns: void.
+*/
 void copyWord(char *copy, char *original, int length){
 	for(int i=0; i <= length;i++){
 		copy[i] = original[i];
 	}
 }
 
+/*
+This function separates two words that are separated by a special character.
+char *delimiter: a pointer to a char array that contains the special character to
+	separate by.
+char *str: a pointer to a char array that is to be separated by the delimiter.
+char *firstWord: a pointer to a char array where the first word is to be copied to.
+char *secondWord: a pointer to a char array where the second word is to be copied to.
+Returns: void.
+*/
 void separateWords(char * delimiter, char *str, char *firstWord, char *secondWord){
 	strcpy(firstWord, strtok(str, delimiter));
 	strcpy(secondWord, strtok(NULL, "\n"));
 }
 
+/*
+This function reads the words in the hangman_text file into the Words struct.
+	It will store the length of each word and the maximum number of guesses
+	for each entry within the Words struct.
+Returns: void.
+*/
 int readInWords(){
 	FILE *fp = fopen(HANGMAN_FILE, "r");
 	char str[MAX_LINE];
@@ -57,34 +86,50 @@ int readInWords(){
 	
 	while(fgets(str, sizeof(str), fp) != NULL){
 		
+		//get words
 		separateWords(",", str, firstWord, secondWord);
 		
+		//get the length of each word
 		words[i].firstLength = getWordLength(firstWord);
 		words[i].lastLength = getWordLength(secondWord);
 
+		// allocate space for the new words
 		words[i].firstWord = malloc(words[i].firstLength * sizeof(char));
 		words[i].lastWord = malloc(words[i].lastLength * sizeof(char));
 		
-		
-
+		//copy words to the words struct
 		copyWord(words[i].firstWord, firstWord, words[i].firstLength);
 		copyWord(words[i].lastWord, secondWord, words[i].lastLength);
 
+		//calculate maximum guesses for this entry
 		words[i].maxGuess = getMaxGuesses(words[i].firstLength, words[i].lastLength);
-		i++;
+		i++; //increment counter
 		
 	}
 	free(firstWord);
 	free(secondWord);
-	fclose(fp);	
-	return 1;
+	fclose(fp);
+	return 1;	
 }
 
+/*
+This function calculates the maximum number of guesses based off the minimum
+	value of an equation and the length of the alphabet.
+	The equation is LENGTH = FIRST_LENGTH + LAST_LENGTH + 10.
+	Thus maximum guesses is MIN(LENGTH, 26)
+int firstWord: an integer that contains the length of the first word.
+int secondWord: an integer that contains the length of the second word.
+Returns: An integer with the maximum number of guesses.
+*/
 int getMaxGuesses(int firstWord, int secondWord){
 	int length = firstWord + secondWord + MIN_GUESSES;	
 	return min(length, MAX_GUESSES);
 }
 
+/*
+This function manages the freeing of the dynamic space in the Words struct.
+Returns: Void.
+*/
 void clearWords(){
 	for(int i = 0; i < (int)(sizeof(words)/sizeof(Word)); i++){
 		free(words[i].firstWord);
@@ -93,56 +138,20 @@ void clearWords(){
 	free(words);
 }
 
+/*
+This function gets a random word index using the length of the Words struct.
+int firstWord: an integer with the length of the Words struct.
+Returns: An integer with the randomised index for a word.
+*/
 int getRandomWordId(int length){
 	return random() % length;
 }
 
-void resetLetterLocations(Client *client){
-	int iterations = max(client->firstLength, client->lastLength);
-
-	for(int i =0; i < iterations; i++){
-		if (i < client->firstLength){
-			client->firstWord[i] = FALSE;
-		}
-		
-		if (i < client->lastLength){ 
-			client->lastWord[i] = FALSE;
-		}
-	}
-}
-
-void getLetterLocations(Client *client, char letter){
-	int iterations = max(client->firstLength, client->lastLength);
-	
-	for(int i = 0; i < iterations; i++){
-		if (i < client->firstLength && 
-			words[client->wordId].firstWord[i] == letter){
-			client->firstWord[i] = TRUE;
-		}
-		
-		if (i < client->lastLength && 
-			words[client->wordId].lastWord[i] == letter){
-			client->lastWord[i] = TRUE;
-		}
-	}
-}
-
-void initialiseClient(Client *client, char *username){
-	client->username = malloc(sizeof(username));
-	strcpy(client->username, username);
-	client->gamesPlayed = 0;
-	client->gamesWon = 0;
-}
-
-void initialiseClientWords(Client *client, int length){
-	client->wordId = getRandomWordId(length);
-	client->firstLength = words[client->wordId].firstLength;
-	client->lastLength = words[client->wordId].lastLength;
-	client->firstWord = calloc(client->firstLength, sizeof(int));
-	client->lastWord = calloc(client->lastLength, sizeof(int));
-	client->maxGuess = words[client->wordId].maxGuess;
-}
-
+/*
+This function stores the credentials within the Authentication text file
+	within the accounts struct.
+Returns: void.
+*/
 void storeCredentials(){
 	FILE *fp;
 	char str[MAX_LINE];
@@ -153,31 +162,44 @@ void storeCredentials(){
 	int passLength = 0;
 
 	fp = fopen(ACCOUNTS_FILE, "r");
+
 	if(fp == NULL){
-		printf("Could not Authenticate file");
+		printf("Could not open file");
 	}
+
 	while(fgets(str, MAX_LINE, fp) != NULL){
+		// check if the line is reading the header line in Authentication.txt
 		if(i > 0){
-			
+			//separate by tab/new line/ space
 			separateWords(" \r\t\n", str, userTemp, passTemp);
+			//if a tab is still present at start of word, trim again
 			if(passTemp[0] == '\t');{
 				strcpy(passTemp, strtok(passTemp, "\t"));
 			}
+			
+			//get length of credentials and store them in the struct
 			userLength = getWordLength(userTemp);
 			passLength = getWordLength(passTemp);
-			accounts[i-1].username = malloc(userLength * sizeof(char));
+			accounts[i-1].username = malloc(userLength * sizeof(char)); // i-1 due to header line in file
 			accounts[i-1].password = malloc(passLength * sizeof(char));
 
 			copyWord(accounts[i-1].username, userTemp, userLength);
 			copyWord(accounts[i-1].password, passTemp, passLength);
 		}
-		i++;
+		i++; // increment counter
 	}
 	free(userTemp);
 	free(passTemp);
 	fclose(fp);
 }
 
+/*
+This function checks a set of credentials against all of the credentials within the accounts struct.
+char *username: a pointer to a char array that contains the username to check.
+char *password: a pointer to a char array that contains the password to check.
+int length: the length of the accounts struct.
+Returns: An integer that is 1(TRUE) if a match is found, or  0(FALSE) if no match is found.
+*/
 int checkCredentials(char *username, char *password, int length){
 	int usernameLength = getWordLength(username);
 	int passwordLength = getWordLength(password);
@@ -197,167 +219,10 @@ int checkCredentials(char *username, char *password, int length){
 	return FALSE;
 }
 
-int checkStringsEqual(char *stringOne, char *stringTwo, int lengthOne, int lengthTwo){
-	printf("%d %d\n", lengthOne, lengthTwo);
-	
-	if(lengthOne != lengthTwo){
-		return FALSE;
-	}
-	
-	for (int i = 0; i < lengthOne; i++){
-		if(stringOne[i] != stringTwo[i]){
-			return FALSE;
-		}
-	}
-
-	return TRUE;
-}
-
-
-int compareClientGamesWon(Client *clientOne, Client *clientTwo){
-	if(clientOne->gamesWon > clientTwo->gamesWon){
-		return CLIENT_TWO;
-	} else if (clientOne->gamesWon < clientTwo->gamesWon){
-		return CLIENT_ONE;
-	} else {
-		return DRAW;
-	}
-}
-
-int compareClientGamesPercentage(Client *clientOne, Client *clientTwo){
-	if(clientOne->percentage > clientTwo->percentage){
-		return CLIENT_TWO;
-	} else if (clientOne->percentage < clientTwo->percentage){
-		return CLIENT_ONE;
-	} else {
-		return DRAW;
-	}
-}
-
-int compareClientNames(Client *clientOne, Client *clientTwo){
-	int compareResult = strcmp(clientOne->username, clientTwo->username);	
-	if(compareResult > 0){
-		return CLIENT_TWO;
-	} else {
-		return CLIENT_ONE;
-	} 
-}
-
-int compareClients(Client *clientOne, Client *clientTwo){
-	int compareResult = 0;
-
-	compareResult= compareClientGamesWon(clientOne, clientTwo);
-	if(compareResult == DRAW){
-		compareResult = compareClientGamesPercentage(clientOne, clientTwo);
-		if(compareResult == DRAW){
-			compareResult = compareClientNames(clientOne, clientTwo);
-		}
-		
-	}
-	return compareResult;
-}
-
-void orderLeaderboard(){
-
-	for (int i = 1; i < numClients; i++){
-		if(clients[i].gamesPlayed == 0){
-			continue;		
-		}
-		for (int j = 0; j < numClients - i; j++){
-			if(clients[j].gamesPlayed == 0){
-				continue;		
-			}
-			
-			if(compareClients(&clients[j], &clients[j+1]) == CLIENT_TWO){
-				temp = clients[j];
-				clients[j] = clients[j+1];
-				clients[j+1] = temp;
-			}	
-		}
-		
-	}
-}
-
-int getNumberOfPlayersOnLeaderboard(){
-	int players = 0;
-	for(int i = 0; i < numClients; i++){
-		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
-			players++;
-		}
-	}
-	return players;
-}
-
-void sendClientLeaderboard(int socketId){
-	uint16_t numClientsSent;
-	uint16_t messageSizeSent;
-	uint16_t clientValue;
-	int numPlayersOnboard = getNumberOfPlayersOnLeaderboard();
-
-	numClientsSent = htons(numPlayersOnboard);	
-	send(socketId, &numClientsSent, sizeof(uint16_t), 0);
-	printf("Num of Read Clients: %d\n", numPlayersOnboard);
-	for(int i = 0; i < numClients; i++){
-		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
-			messageSizeSent = htons(strlen(clients[i].username));
-			send(socketId, &messageSizeSent, sizeof(uint16_t), 0);
-			send(socketId, clients[i].username, strlen(clients[i].username), 0);
-			
-			clientValue = htons(clients[i].gamesPlayed);
-			send(socketId, &clientValue, sizeof(uint16_t), 0);
-			clientValue = htons(clients[i].gamesWon);
-			send(socketId, &clientValue, sizeof(uint16_t), 0);
-		}
-	}
-}
-
-int addClient(char *username){
-	if(numClients > 0){
-		numClients++;
-		printf("number of clients that are listed are: %d\n", numClients);
-		clients = realloc(clients, sizeof (Client) * (numClients));
-		printf("Initialising Client %d \n", numClients);
-		initialiseClient(&clients[numClients-1], username);
-		return numClients - 1;
-	} else {
-		initialiseClient(&clients[0], username);
-		return numClients++;
-	}
-}
-
-void getClientByUsername(char *username, Client client){
-	if(clients != NULL){
-		int numClients = sizeof(clients)/sizeof(clients[0]);
-		for(int i = 0; i < numClients; i++){
-			if(!strcmp(clients[i].username,username)){
-				client = clients[i];
-				break;
-			}
-		}
-	}
-}
-
-int getClientIndexByUsername(char *username){
-	if(clients != NULL){
-		for(int i = 0; i < numClients; i++){
-			if(!strcmp(clients[i].username,username)){
-				return i;
-			}
-		}
-	}
-	return -1;
-}
-
-void updateLeaderboardWithClient(char *username, int gameWon){
-	int clientIndex = getClientIndexByUsername(username);
-
-	clients[clientIndex].gamesPlayed++;
-	clients[clientIndex].gamesWon += gameWon;
-
-	orderLeaderboard(); 
-}
-
-
+/*
+This function manages the freeing of the dynamic memory allocated to the accounts struct.
+Returns: Void.
+*/
 void clearAccounts(){
 	for(int i = 0; i < numAccounts; i++){
 		free(accounts[i].username);
@@ -365,84 +230,5 @@ void clearAccounts(){
 	}
 	free(accounts);
 }
-
-void clearClients(){
-	for(int i = 0; i < numClients; i++){
-		free(clients[i].username);
-		if(clients[i].firstWord != NULL){
-			free(clients[i].firstWord);
-			free(clients[i].lastWord);
-		}
-	}
-	free(clients);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void leaderboardReadUnlock(){
-	pthread_mutex_lock(&readerCounterMutex);
-	readerCounter--;
-	
-	if(readerCounter == NO_READING_OCCURING){
-		pthread_mutex_unlock(&writerMutex);
-	}
-	
-	pthread_mutex_unlock(&readerCounterMutex);
-}
-
-void leaderboardReadLock(){
-	pthread_mutex_lock(&readerMutex);
-	pthread_mutex_lock(&readerCounterMutex);
-	readerCounter++;
-	
-	if(readerCounter == READ_OCCURRING){
-		pthread_mutex_lock(&writerMutex);
-	}
-	
-	pthread_mutex_unlock(&readerCounterMutex);
-	pthread_mutex_unlock(&readerMutex);
-}
-
-void leaderboardWriteLock(){
-	pthread_mutex_lock(&writerMutex);
-	pthread_mutex_lock(&readerMutex);
-}
-
-void leaderboardWriteUnlock(){
-	pthread_mutex_unlock(&writerMutex);
-	pthread_mutex_unlock(&readerMutex);
-}
-
-void initialiseLeaderboardMutex(){
-	readerCounter = 0;
-	pthread_mutex_init(&writerMutex, NULL);
-	pthread_mutex_init(&readerCounterMutex, NULL);
-	pthread_mutex_init(&readerMutex, NULL);
-	
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

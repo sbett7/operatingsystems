@@ -7,7 +7,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NUM_OF_CONNECTIONS 10
+
+#define MAX_CONNECTIONS 10
 #define BACKLOG 10
 
 #define HANGMAN 	1
@@ -17,30 +18,46 @@
 #define GAME_CONTINUE 0
 #define GAME_LOST 1
 #define GAME_WON 2
+#define NO_ACTIVE_CONNECTION -1
+#define WON_GAME 1
+#define LOST_GAME 0 
 
 #define MAX_DATA_SIZE 100
 
-int numWords;
-int numAccounts;
+#define DEFAULT_SOCKET 12345
 
-pthread_t  clientThreads[NUM_OF_CONNECTIONS];
+#define LETTER_Z 'z'
+#define LETTER_A 'a'
+
+pthread_t  clientThreads[MAX_CONNECTIONS];
 
 pthread_mutex_t connectionMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_cond_t  gotConnection   = PTHREAD_COND_INITIALIZER;
+
+
 
 struct connection{
 	int socketId;
 	struct connection* next;
 };
 
+struct thread{
+	int threadId;
+	int socketId;
+};
+
 //pthread_mutex_t connectionMutex;
 //pthread_cond_t gotConnection;
 
 int numConnections = 0;
+int numActiveConnections = 0;
 int rc;
+int closeProgram = FALSE;
 
 struct connection *connections = NULL;
 struct connection *lastConnection = NULL;
+
+struct thread *threads;
 
 
 void getUserCredentials(int socketId, char *user, char *password){
@@ -122,18 +139,18 @@ int getGameStatus(int socketId){
 void hangmanGame(int socketId, Client *client){
 	int *wordInformation = malloc(3 * sizeof(int));
 	char guess;
+	int wonGame = LOST_GAME;
 
 	initialiseClientWords(client, numWords);
 	wordInformation[0] = words[client->wordId].firstLength;
 	wordInformation[1] = words[client->wordId].lastLength;
 	wordInformation[2] = words[client->wordId].maxGuess;
-	client->gamesPlayed++;
+	
 	sendWordLength(socketId, wordInformation);
-	printf("%s", client->username);
 	
 	while(1){
 		guess = getClientGuess(socketId);
-		if(guess <= 'z' && guess >= 'a'){
+		if(guess <= LETTER_Z && guess >= LETTER_A){
 			getLetterLocations(client, guess);
 			sendLetterPositions(socketId, client);
 			resetLetterLocations(client);
@@ -142,14 +159,18 @@ void hangmanGame(int socketId, Client *client){
 			break;
 		}
 	}
-	if(guess == GAME_WON){
-		client->gamesWon++;
-	}
-	printf("got to locking\n");
+	
+	printf("Locking Write Mutex for Client %d\n", getClientIndexByUsername(client->username) + 1);
 	leaderboardWriteLock();
-	printf("got to updation\n");
-	printf("%s, %d, %d\n", client->username, client->gamesPlayed, client->gamesWon);
-	updateLeaderboardWithClient(client);
+	printf("Updating leaderboard for Client %d\n", getClientIndexByUsername(client->username) + 1);
+	//printf("%s, %d, %d\n", client->username, client->gamesPlayed, client->gamesWon);
+
+	printf("Unlocking Write Mutex for Client %d\n", getClientIndexByUsername(client->username) + 1);
+	if(guess == GAME_WON){
+		wonGame = WON_GAME;
+	}
+
+	updateLeaderboardWithClient(client->username, wonGame);
 	printf("got to unlocking\n");
 	leaderboardWriteUnlock();
 
@@ -232,7 +253,7 @@ void handleConnection(int socketId){
 	char *password = malloc(MAX_DATA_SIZE * sizeof(char));
 	int clientIndex = 0;
 	getUserCredentials(socketId, username, password);
-	printf("num accounts: %d\n", numAccounts);
+
 	accountVerified = checkCredentials(username, password, numAccounts);
 
 	printf("Account Verified: %d\n", accountVerified);
@@ -241,7 +262,7 @@ void handleConnection(int socketId){
 	if(accountVerified == TRUE){
 
 		clientIndex = getClientIndexByUsername(username);
-		//printf("%d\n",clientIndex);
+
 		if(clientIndex == -1){
 			clientIndex = addClient(username);
 			printf("Client Index: %d\n", clientIndex);
@@ -260,21 +281,26 @@ void handleConnection(int socketId){
 	}
 }
 
-void* threadConnectionHandler(){
+void* threadConnectionHandler(void* data){
 	struct connection *clientConnection;
-	rc = pthread_mutex_lock(&connectionMutex);	
-	
+	rc = pthread_mutex_lock(&connectionMutex);
+	int threadId = *(int*)data;
 	while(1){
 		if(numConnections > 0){
 			clientConnection = getConnection(&connectionMutex);
 
 			if(clientConnection){
+				numActiveConnections++;
+		
+				threads[threadId].socketId = clientConnection->socketId;		
 				rc = pthread_mutex_unlock(&connectionMutex);
 				handleConnection(clientConnection->socketId);
 				close(clientConnection->socketId);
 				free(clientConnection);
 				rc = pthread_mutex_lock(&connectionMutex);
-
+				threads[threadId].socketId = NO_ACTIVE_CONNECTION;
+				
+				numActiveConnections--;
 			}
 		} else{
 			rc = pthread_cond_wait(&gotConnection, &connectionMutex);
@@ -283,24 +309,48 @@ void* threadConnectionHandler(){
 }
 
 void clearThreads(){
-	for (int i = 0; i < NUM_OF_CONNECTIONS; i++){
+	for (int i = 0; i < MAX_CONNECTIONS; i++){
+		if(threads[i].socketId != NO_ACTIVE_CONNECTION){
+			printf("closing Thread %d's connection\nSocketId = %d", i, threads[i].socketId);
+			close(threads[i].socketId);
+			//pthread_join(i, NULL);
+		}
+	}
+	free(threads);
+	/*	
+	for(int i = 0; i < MAX_CONNECTIONS; i++){
 		pthread_exit(&clientThreads[i]);
 	}
+	*/
+}
+
+void endProgram(){
+	printf("\nShutting Down Server...\n");
+	clearThreads();
+	clearClients();
+	clearWords();	
+	clearAccounts();
+	
+	printf("Goodbye!\n");
+	exit(0);
 }
 
 void endProgramHandler() {
-	clearWords();
-	clearThreads();
+	endProgram();
 }
 
+
+
 void createThreads(){ 	
-	for(int i = 0; i < NUM_OF_CONNECTIONS; i++){
-		pthread_create(&clientThreads[i], NULL, threadConnectionHandler, NULL);
+	for(int i = 0; i < MAX_CONNECTIONS; i++){
+		pthread_create(&clientThreads[i], NULL, threadConnectionHandler, (void*)&i);
+		threads[i].socketId = NO_ACTIVE_CONNECTION;
 	}
 }
 
 int main(int argc, char *argv[]){
 	int sockFd, newFd;
+	int serverSocket;
 	struct sockaddr_in serverAddress;
 	struct sockaddr_in clientAddress;
 	socklen_t sin_size;
@@ -318,13 +368,18 @@ int main(int argc, char *argv[]){
 	clients = malloc(sizeof(Client));
 	numClients = 0;
 
+	threads = malloc(MAX_CONNECTIONS * sizeof(struct thread));
+
 	storeCredentials();
 	readInWords();
 
 	if (argc != 2) {
-		fprintf(stderr,"usage: port number\n");
-		exit(1);
+		serverSocket = DEFAULT_SOCKET;
+		printf("No socket provided by the user.  Using default socket\n");
+	} else{
+		serverSocket = atoi(argv[1]);
 	}
+	printf("The socket used by the server is: %d\n\n", serverSocket);
 	
 	if((sockFd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("socket error");
@@ -332,7 +387,7 @@ int main(int argc, char *argv[]){
 	}
 
 	serverAddress.sin_family = AF_INET;         /* host byte order */
-	serverAddress.sin_port = htons(atoi(argv[1]));     /* short, network byte order */
+	serverAddress.sin_port = htons(serverSocket);     /* short, network byte order */
 	serverAddress.sin_addr.s_addr = INADDR_ANY; /* auto-fill with my IP */
 	
 	 memset(serverAddress.sin_zero, '\0', sizeof(serverAddress.sin_zero));
@@ -350,30 +405,26 @@ int main(int argc, char *argv[]){
 
 	createThreads();
 
-	while(1){
+	while(closeProgram != TRUE){
 		sin_size = sizeof(struct sockaddr_in);
 		if ((newFd = accept(sockFd, (struct sockaddr *)&clientAddress, \
 		&sin_size)) == -1) {
 			perror("accept");
 			continue;
 		}
+		printf("closeProgram is: %d\n", closeProgram);
 		printf("server: got connection from %s\n", \
 			inet_ntoa(clientAddress.sin_addr));
-		
-		addConnection(newFd, &connectionMutex, &gotConnection);
-
-		/*
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-		pthread_create(&client_thread, NULL, (void*)HangmanFunction, (void*)&newFd);
-		*/
-		
-			
-		//pthread_join(client_thread, NULL);
-		//close(newFd);  /* parent doesn't need this */
-
-		//while(waitpid(-1,NULL,WNOHANG) > 0); /* clean up child processes */
+		if(numActiveConnections != MAX_CONNECTIONS){
+			addConnection(newFd, &connectionMutex, &gotConnection);
+		} else{
+			printf("Reached maximum number of connections. closing new connection\n");
+			close(newFd);
+		}
 		
 	}
+	printf("got here\n");
+	endProgram();
+	return 0;
 }
 

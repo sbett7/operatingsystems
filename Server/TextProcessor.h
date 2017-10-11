@@ -45,6 +45,8 @@
 #define READ_OCCURRING 1
 #define NO_READING_OCCURING 0
 
+#define NO_GAMES_PLAYED 0
+
 struct word{
 	int id;
 	char *firstWord;
@@ -93,6 +95,8 @@ pthread_mutex_t readerMutex;
 pthread_mutex_t writerMutex;
 
 int readerCounter;
+int numWords;
+int numAccounts;
 
 
 int getWordLength(char * word);
@@ -122,7 +126,6 @@ void initialiseClientWords(Client *client, int length);
 void storeCredentials();
 int checkCredentials(char *username, char *password, int length);
 
-void clearClients();
 void getClientByUsername(char *username, Client client);
 int addClient(char *username);
 void sendClientLeaderboard(int socketId);
@@ -131,8 +134,9 @@ void orderLeaderboard();
 int compareClients(Client *clientOne, Client *clientTwo);
 int compareClientGamesPercentage(Client *clientOne, Client *clientTwo);
 int compareClientGamesWon(Client *clientOne, Client *clientTwo);
-void updateLeaderboardWithClient(Client *client);
+void updateLeaderboardWithClient(char *username, int gameWon);
 int getClientIndexByUsername(char *username);
+int getNumberOfPlayersOnLeaderboard();
 
 
 /*
@@ -151,7 +155,8 @@ void leaderboardWriteUnlock();
 void initialiseLeaderboardMutex();
 
 
-
+void clearClients();
+void clearAccounts();
 
 
 

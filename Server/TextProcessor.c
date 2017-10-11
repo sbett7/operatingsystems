@@ -258,8 +258,7 @@ int compareClients(Client *clientOne, Client *clientTwo){
 }
 
 void orderLeaderboard(){
-	int compValue = 0;
-	printf("segmentation fault after this\n");
+
 	for (int i = 1; i < numClients; i++){
 		if(clients[i].gamesPlayed == 0){
 			continue;		
@@ -269,7 +268,6 @@ void orderLeaderboard(){
 				continue;		
 			}
 			
-			compValue = compareClients(&clients[i], &clients[j]);
 			if(compareClients(&clients[j], &clients[j+1]) == CLIENT_TWO){
 				temp = clients[j];
 				clients[j] = clients[j+1];
@@ -280,17 +278,27 @@ void orderLeaderboard(){
 	}
 }
 
+int getNumberOfPlayersOnLeaderboard(){
+	int players = 0;
+	for(int i = 0; i < numClients; i++){
+		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
+			players++;
+		}
+	}
+	return players;
+}
+
 void sendClientLeaderboard(int socketId){
 	uint16_t numClientsSent;
 	uint16_t messageSizeSent;
 	uint16_t clientValue;
-	int retval = 0;
+	int numPlayersOnboard = getNumberOfPlayersOnLeaderboard();
 
-	numClientsSent = htons(numClients);	
+	numClientsSent = htons(numPlayersOnboard);	
 	send(socketId, &numClientsSent, sizeof(uint16_t), 0);
-	printf("Num of Read Clients: %d\n", numClients);
+	printf("Num of Read Clients: %d\n", numPlayersOnboard);
 	for(int i = 0; i < numClients; i++){
-		if(clients[i].gamesPlayed != 0){
+		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
 			messageSizeSent = htons(strlen(clients[i].username));
 			send(socketId, &messageSizeSent, sizeof(uint16_t), 0);
 			send(socketId, clients[i].username, strlen(clients[i].username), 0);
@@ -329,13 +337,6 @@ void getClientByUsername(char *username, Client client){
 	}
 }
 
-void clearClients(){
-	for(int i = 0; i < numClients; i++){
-		free(clients[i].username);
-	}
-	free(clients);
-}
-
 int getClientIndexByUsername(char *username){
 	if(clients != NULL){
 		for(int i = 0; i < numClients; i++){
@@ -347,134 +348,47 @@ int getClientIndexByUsername(char *username){
 	return -1;
 }
 
-void updateLeaderboardWithClient(Client *client){
-	int clientIndex = getClientIndexByUsername(client->username);
-	printf("Client Index is: %d\n", clientIndex);
-	clients[clientIndex].gamesPlayed = client->gamesPlayed;
-	clients[clientIndex].gamesWon = client->gamesWon;
-	printf("issue with leaderboard\n");
+void updateLeaderboardWithClient(char *username, int gameWon){
+	int clientIndex = getClientIndexByUsername(username);
+
+	clients[clientIndex].gamesPlayed++;
+	clients[clientIndex].gamesWon += gameWon;
 
 	orderLeaderboard(); 
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-void addConnection(int socketId, pthread_mutex_t *pMutex, pthread_cond_t *pCondVar){
-	int rc;
-	struct connection *clientConnection;
-
-	clientConnection = (struct connection*)malloc(sizeof(struct connection));
-
-	if(!clientConnection){
-		fprintf(stderr, "AddConnection: out of memory\n");
-		exit(1);
+void clearAccounts(){
+	for(int i = 0; i < numAccounts; i++){
+		free(accounts[i].username);
+		free(accounts[i].password);
 	}
-
-	clientConnection->socketId = socketId;
-	clientConnection->next = NULL;
-	
-	rc = pthread_mutex_lock(pMutex);
-	
-	if(numConnections == NO_PENDING_CONNECTIONS){
-		connections = clientConnection;
-		lastConnection = clientConnection;
-	} else{
-		lastConnection->next = clientConnection;
-		lastConnection = clientConnection;
-	}
-	numConnections++;
-
-	rc = pthread_mutex_unlock(pMutex);
-	rc = pthread_cond_signal(pCondVar);
+	free(accounts);
 }
 
-struct connection* getConnection(pthread_mutex_t *pMutex){
-	int rc;
-	struct connection *clientConnection;
-	
-	rc = pthread_mutex_lock(pMutex);
-	
-	if(numConnections > 0){
-		clientConnection = connections;
-		connections = clientConnections->next;
-		if(connections == NULL){
-			lastConnection = NULL;
-		}
-		numConnections--;
-		
-	} else{
-		clientConnection = NULL;
-	}
-
-	rc = pthread_mutex_unlock(pMutex);
-
-	return clientConnection;
-}
-
-void handleConnection(int socketId){
-	int command = 0;
-	int accountVerified;
-	char *username = malloc(MAX_DATA_SIZE * sizeof(char));
-	char *password = malloc(MAX_DATA_SIZE * sizeof(char));
-	int clientIndex = 0;
-	getUserCredentials(sockFd, username, password);	
-	accountVerified = checkCredentials(username, password, numAccounts);
-	sendAuthenticationResult(sockFd, accountVerified);
-	if(accountVerified){
-
-		Client client;
-		clientIndex = getClientIndexByUsername(username);
-		//printf("%d\n",clientIndex);
-		if(clientIndex == -1){
-			clientIndex = addClient(username);
-		}
-		
-		while (command != EXIT){
-			command = getCommand(sockFd);
-			//printf("command received was: %d\n", command);
-			performCommand(command, sockFd, &clients[clientIndex]);
-		}
-	} else{
-		printf("User was not verified, closing connection");	
-	}
-}
-
-void* threadConnectionHandler(){
-	struct connection *clientConnection;
-
-	while(1){
-		if(numConnections > 0){
-			clientConnection = getConnection(&connectionMutex);
-			
-			if(clientConnection){
-				rc = pthread_mutex_unlock(&connectionMutex);
-				handleConnection(clientConnection->socketId);
-				close(clientConnection->socketId);
-				free(clientConnection);
-				rc = pthread_mutex_lock(&connectionMutex);
-			}
-		} else{
-
-			rc = pthread_cond_wait(&gotConnection, &connectionMutex);
+void clearClients(){
+	for(int i = 0; i < numClients; i++){
+		free(clients[i].username);
+		if(clients[i].firstWord != NULL){
+			free(clients[i].firstWord);
+			free(clients[i].lastWord);
 		}
 	}
+	free(clients);
 }
-*/
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void leaderboardReadUnlock(){
 	pthread_mutex_lock(&readerCounterMutex);
@@ -501,13 +415,13 @@ void leaderboardReadLock(){
 }
 
 void leaderboardWriteLock(){
-	pthread_mutex_lock(&readerMutex);
 	pthread_mutex_lock(&writerMutex);
+	pthread_mutex_lock(&readerMutex);
 }
 
 void leaderboardWriteUnlock(){
-	pthread_mutex_unlock(&readerMutex);
 	pthread_mutex_unlock(&writerMutex);
+	pthread_mutex_unlock(&readerMutex);
 }
 
 void initialiseLeaderboardMutex(){

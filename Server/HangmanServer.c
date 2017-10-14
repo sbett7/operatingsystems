@@ -86,7 +86,7 @@ void hangmanGame(int socketId, Client *client){
 	free(wordInformation);
 	
 	//play the game until the client has sent back a finished command
-	while(guess == GAME_WON || guess == GAME_LOST){
+	while(guess != GAME_WON || guess != GAME_LOST){
 		guess = getClientGuess(socketId);
 		if(guess <= LETTER_Z && guess >= LETTER_A){
 			getLetterLocations(client, guess);

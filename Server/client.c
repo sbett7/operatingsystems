@@ -42,8 +42,6 @@ void Send_Array_Data(int socket_id, int command) {
 void receiveWordInformation(int socketId, int wordInformation[3]){
 	uint16_t value;
 	int retValue;
-	printf("got here\n");
-
 
 	for(int i = 0; i < 3; i++){
 		recv(socketId, &value, sizeof(uint16_t), 0);
@@ -127,21 +125,21 @@ void sendGuess(int socketId, char letter){
 	if(send(socketId, &value, sizeof(uint16_t), 0) < 0){
 		printf("error\n");
 	}
-	//send(socketId, &letter, sizeof(char), 0);
+	send(socketId, &letter, sizeof(char), 0);
 }
 
-void printWordInfo(char *word, char *guessedLetters, int length, int guessedIndex, int maxGuesses){
+void printWordInfo(char *word, char *alreadyGuessed, int length, int guessedIndex, int maxGuesses){
 	
-	printf("The last letter used was: %c\n", guessedLetters[guessedIndex]);	
-	printf("The used letters are: ");
-	for(int i = 0; i < guessedIndex; i++){
-		printf("%c ", guessedLetters[i]);
+	printf("Guessed Letters: ");
+	int loopIndex;
+	for (loopIndex = 0; loopIndex < guessedIndex; loopIndex++){
+	printf("%c",alreadyGuessed[loopIndex]);
 	}
 
-	printf("\n\nThe number of remaining guesses is: %d\n\n", maxGuesses - (guessedIndex + 1));
+	printf("\n\nNumber of guesses left: %d\n\n", maxGuesses - (guessedIndex + 1));
 
 	for(int i = 0; i < length; i++){
-		printf("%c", word[i]);
+		printf("%c ", word[i]);
 	}
 	printf("\n");
 }
@@ -208,25 +206,37 @@ int main(int argc, char *argv[]) {
 	int currentGuesses = 0;
 	char username[MAXDATASIZE];
 	char password[MAXDATASIZE];
-	printf("Username: ");
+	int count = 0;
+	char burner[16];
+	printf("=============================================\n\n");
+	printf("Welcome to the Online Hangman Gaming System\n\n");
+	printf("=============================================\n\n");
+	printf("You are required to logon with your Username and Password\n\n");
+	printf("Username -->");
 	scanf("%s", username);
-	printf("Password: ");
+	printf("Password -->");
 	scanf("%s", password);
 	send(sockfd, &username, MAXDATASIZE, 0);
 	send(sockfd, &password, MAXDATASIZE, 0);
 
 	int authorisation = getAuthorisationResult(sockfd);
 	if (!authorisation){
-		printf("failed to authorise\n");
+		printf("\n\nYou Entered Either an Incorrect Username or Password - Disconnecting\n");
 	}
 	
 	
 	while(value != 3 && authorisation){
-		printf("please give a command: ");
+
+		printf("\nPlease enter a selection:\n");
+		printf("<1> Play Hangman\n");
+		printf("<2> Show LeaderBoard\n");
+		printf("<3> Quit\n");
+		printf("\nSelection option 1-3 ->");
 		scanf("%d", &value);
 		printf("command given was: %d\n",value);
 		printf("\n\n");
 		Send_Array_Data(sockfd, value);
+		
 
 		if(value == 1){
 			
@@ -236,29 +246,42 @@ int main(int argc, char *argv[]) {
 			
 			int length = wordInformation[FIRST_LENGTH] + wordInformation[LAST_LENGTH] + 1;
 			char *word = malloc(length*sizeof(char));
-			char *guessedLetters = malloc((wordInformation[MAX_GUESSES])*sizeof(char));
 			char completionType;
+			char guessedLetters[MAX_GUESSES];
 			int *wordPosition = malloc(length*sizeof(int));
-			printf("Got here");
+			char letterInput;
+			char guess[16];
+			int incorrectInput;
 			
 			initWord(word, wordInformation[FIRST_LENGTH], length);
-			
+			fgets(burner, 16, stdin);
 			while(currentGuesses != wordInformation[MAX_GUESSES] && !checkWordIsDone(word, length)){
-				printf("The word is done: %d\n",checkWordIsDone(word, length));
-				char guess;
-				printf("enter your guess: ");	
-							
-								
-				scanf("%c", &guess);
-				if(guess <= 'z' && guess >= 'a'){			
-					sendGuess(sockfd, guess);
 				
+				printf("\n");
+				//printf("The word is done: %d\n",checkWordIsDone(word, length));
+				printWordInfo(word, guessedLetters, length, currentGuesses, wordInformation[MAX_GUESSES]);
+				if (incorrectInput == 1){
+				printf("\n\nPlease Enter a letter, numbers are not accepted!\n\n");
+				incorrectInput = 0;
+				printf("\nEnter your guess: ");
+				} else {
+				printf("\nEnter your guess: ");	
+				}			
+									
+				fgets(guess, 16, stdin);
+				letterInput = guess[0];
+
+				if(letterInput <= 'z' && letterInput >= 'a'){			
+					sendGuess(sockfd, letterInput);
 					getLetterPosition(sockfd, wordPosition, length);
-					updateWord(word, wordPosition, guess, length);
-					guessedLetters[currentGuesses] = guess;
-					printWordInfo(word, guessedLetters, length, currentGuesses, wordInformation[MAX_GUESSES]);
+					updateWord(word, wordPosition, letterInput, length);
+					guessedLetters[currentGuesses] = letterInput;
 					currentGuesses++;
+				} else {
+				incorrectInput = 1;			
 				}
+				printf("\n=============================================\n\n");
+				
 			}
 			
 			
@@ -268,10 +291,15 @@ int main(int argc, char *argv[]) {
 				completionType = GAME_LOST;
 			}
 			sendGameStatus(sockfd, completionType);
-			printf("Done!");
+			printf("\nGame Over\n");
+			if (completionType == GAME_LOST){
+				printf("Bad Luck %s! You have run out of guesses. The Hangman got you!\n\n", username);
+				
+			} else if (completionType == GAME_WON){
+			printf("Well done %s! You won this round of Hangman!\n\n", username);
+			}
 			free(word);
 			free(wordPosition);
-			free(guessedLetters);
 			
 		} else if (value == 2){
 			receivePrintLeaderboard(sockfd);

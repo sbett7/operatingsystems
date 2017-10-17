@@ -103,6 +103,7 @@ int readInWords(){
 
 		//calculate maximum guesses for this entry
 		words[i].maxGuess = getMaxGuesses(words[i].firstLength, words[i].lastLength);
+
 		i++; //increment counter
 		
 	}

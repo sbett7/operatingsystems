@@ -241,7 +241,6 @@ void handleConnection(int socketId){
 			leaderboardWriteLock();
 			clientIndex = addClient(username);
 			leaderboardWriteUnlock();
-			printf("Client Index: %d\n", clientIndex);
 		}
 		
 		while (command != EXIT){
@@ -320,7 +319,7 @@ Returns: Void.
 void clearThreads(){
 	for (int i = 0; i < MAX_CONNECTIONS; i++){
 		if(threads[i].socketId != NO_ACTIVE_CONNECTION){
-			printf("closing Thread %d's connection\nSocketId = %d", i, threads[i].socketId);
+			printf("closing Thread %d's connection\nSocketId = %d\n", i, threads[i].socketId);
 			close(threads[i].socketId);
 		}
 	}
@@ -413,9 +412,9 @@ int main(int argc, char *argv[]){
 		exit(1);
 	}
 
-	serverAddress.sin_family = AF_INET;         /* host byte order */
-	serverAddress.sin_port = htons(serverSocket);     /* short, network byte order */
-	serverAddress.sin_addr.s_addr = INADDR_ANY; /* auto-fill with my IP */
+	serverAddress.sin_family = AF_INET;
+	serverAddress.sin_port = htons(serverSocket);     
+	serverAddress.sin_addr.s_addr = INADDR_ANY; 
 	
 	memset(serverAddress.sin_zero, '\0', sizeof(serverAddress.sin_zero));
 
@@ -437,7 +436,7 @@ int main(int argc, char *argv[]){
 			continue;
 		}
 
-		printf("Server: Connection received from %s\n", \
+		printf("A connection has been received from %s\n", \
 			inet_ntoa(clientAddress.sin_addr));
 		
 		if(numActiveConnections != MAX_CONNECTIONS){

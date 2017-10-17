@@ -53,6 +53,7 @@ Returns: Void.
 */
 void initialiseClient(Client *client, char *username){
 	client->clientId = numClients;
+	printf("A new client has been registed with the following clientID: %d\n", client->clientId);
 	client->username = malloc(sizeof(username));
 	strcpy(client->username, username);
 	client->gamesPlayed = 0;
@@ -221,15 +222,13 @@ char *username: a pointer to a char array for the username that is to be used fo
 Returns: an integer that specifies the client index of the new client.
 */
 int addClient(char *username){
+	numClients++;
 	if(numClients > 0){
-		numClients++;
 		clients = realloc(clients, sizeof (Client) * (numClients));
-		initialiseClient(&clients[numClients-1], username);
-		return numClients - 1;
-	} else {
-		initialiseClient(&clients[0], username);
-		return numClients++;
 	}
+
+	initialiseClient(&clients[numClients-1], username);
+	return numClients - 1;
 }
 
 /*

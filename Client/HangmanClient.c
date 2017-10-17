@@ -63,7 +63,9 @@ Returns: the converted letter as a char.
 */
 char toLowerCase(char letter){
 	if(letter <= UPPER_A && letter >= UPPER_Z){
-		letter += TO_LOWER_CASE;	
+		printf("letter: %c", letter);
+		letter += TO_LOWER_CASE;
+		printf("new letter: %c", letter);	
 	}
 	return letter;
 }
@@ -149,7 +151,7 @@ void printWordInfo(char *word, char *alreadyGuessed, int length, int guessedInde
 	}
 	printf("\n");
 	if (incorrectInput == 1){
-		printf("\n\nPlease Enter a letter, numbers are not accepted!\n\n");
+		printf("\n\nPlease Enter a letter in lowercase, numbers and uppercase letters are not accepted!\n\n");
 	
 	}
 	printf("\nEnter your guess: ");		
@@ -242,7 +244,7 @@ void setWordDataSize(int length, int maxGuess){
 	wordPosition = realloc(wordPosition, length * sizeof(int));
 	word = realloc(word, length * sizeof(char));
 	if(word == NULL){
-		printf("failed to alloc word\n");	
+		printf("failed to allocate word\n");	
 	}
 	guessedLetters = realloc(guessedLetters , maxGuess * sizeof(char));
 }
@@ -281,9 +283,7 @@ void playHangmanGame(){
 
 		//if letter is between A-Z or a-z, send guess to server and update word
 		//else set incorrectInput flag
-		if((letterInput <= LETTER_Z && letterInput >= LETTER_A) ||
-				(letterInput <= UPPER_Z && letterInput >= UPPER_A)){
-			letterInput = toLowerCase(letterInput);			
+		if((letterInput <= LETTER_Z && letterInput >= LETTER_A)){
 			sendGuess(socketId, letterInput);
 			getLetterPosition(socketId, wordPosition, length);
 			updateWord(word, wordPosition, letterInput, length);

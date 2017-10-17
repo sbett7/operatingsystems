@@ -52,6 +52,7 @@ char *username: a pointer to a char array that contains the username of the new 
 Returns: Void.
 */
 void initialiseClient(Client *client, char *username){
+	client->clientId = numClients;
 	client->username = malloc(sizeof(username));
 	strcpy(client->username, username);
 	client->gamesPlayed = 0;
@@ -141,7 +142,7 @@ Returns: An integer that specifies whether clientOne or clientTwo comes first in
 */
 int compareClientNames(Client *clientOne, Client *clientTwo){
 	int compareResult = strcmp(clientOne->username, clientTwo->username);	
-	if(compareResult > 0){
+	if(compareResult < 0){
 		return CLIENT_TWO;
 	} else {
 		return CLIENT_ONE;
@@ -221,7 +222,7 @@ void sendClientLeaderboard(int socketId){
 
 	numClientsSent = htons(numPlayersOnboard);	
 	send(socketId, &numClientsSent, sizeof(uint16_t), 0);
-	printf("Num of Read Clients: %d\n", numPlayersOnboard);
+	printf("Number of Clients on the Leader Board: %d\n", numPlayersOnboard);
 	for(int i = 0; i < numClients; i++){
 		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
 			messageSizeSent = htons(strlen(clients[i].username));
@@ -275,6 +276,24 @@ int getClientIndexByUsername(char *username){
 }
 
 /*
+This function will get the index of a client based upon the given client ID. If no client with that
+	ID is found, -1 will be returned.
+int clientId: an integer containing the ID that is to be found.
+Returns: an integer that specifies the client index of the client with that username.  If no client
+	with that username is found, -1 is returned.
+*/
+int getClientIndexByClientId(int clientId){
+	if(clients != NULL){
+		for(int i = 0; i < numClients; i++){
+			if(clients[i].clientId == clientId){
+				return i;
+			}
+		}
+	}
+	return -1;
+}
+
+/*
 This function updates the client with the given username.  It will increment the number of games played
 	and add gamesWon to the client.  It will then order the leaderboard.
 char *username: a pointer to a char array for the username that is to be used for the client that is
@@ -282,8 +301,8 @@ char *username: a pointer to a char array for the username that is to be used fo
 int gamesWon: an integer that contains the number of gamesWon by the user.  This value is either 1 or 0.
 Returns: void.
 */
-void updateLeaderboardWithClient(char *username, int gameWon){
-	int clientIndex = getClientIndexByUsername(username);
+void updateLeaderboardWithClient(int clientId, int gameWon){
+	int clientIndex = getClientIndexByClientId(clientId);
 
 	clients[clientIndex].gamesPlayed++;
 	clients[clientIndex].gamesWon += gameWon;

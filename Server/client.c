@@ -35,15 +35,19 @@
 #define LETTER_Z 'z'
 #define LETTER_A 'a'
 
+#define HANGMAN 1
+#define LEADERBOARD 2
+#define EXIT 3
+
+void printMenu(int menuType);
 
 /*
 This function sends an array value for menu communication
-
 int socket_id: the socket identifier for the server
 int command: the menu command sent to the server
 Returns: Void.
 */
-void Send_Array_Data(int socket_id, int command) {
+void sendCommand(int socket_id, int command) {
 
 	uint16_t item = 0;	
 
@@ -55,7 +59,6 @@ void Send_Array_Data(int socket_id, int command) {
 
 /*
 This function obtains the length of the phrase from the server
-
 int socketid: the socket identifier for the server
 int wordInformation: array to store the lengths of each word
 Returns: Void.
@@ -73,7 +76,6 @@ void receiveWordInformation(int socketId, int wordInformation[3]){
 /*
 This function receives each of the values for the leaderboard from the server
 	and prints it to the console
-
 int socketid: the socket identifier for the server
 int wordInformation: array to store the lengths of each word
 Returns: Void.
@@ -115,7 +117,6 @@ void receivePrintLeaderboard(int socketId){
 
 /*
 This function checks if the character sent matches the word in any places
-
 int socketid: the socket identifier for the server
 int *position: integer array of matched positions
 int length: length of the word
@@ -133,7 +134,6 @@ void getLetterPosition(int socketId, int *position, int length){
 /*
 This function updates the word array according to the information
 	retrieved from the position array
-
 char *word: the client's current word array
 int *position: the true/false position array, True means a letter matched in word
 char letter: the current user guess
@@ -150,7 +150,6 @@ void updateWord(char *word, int *position, char letter, int length){
 
 /*
 Simple function to check if the word has been completed yet
-
 char *word: the client's current word array
 int length: lenght of the words
 Returns: int value, TRUE if game is completed.
@@ -167,7 +166,6 @@ int checkWordIsDone(char *word, int length){
 /*
 This function initialises the clients character array for the start
 	of the game with '_' to match unknown letters in the word
-
 char *word: the client's current word
 int firstWordLength: the value in the array for the end of the first word
 	so that the words can be separated by a white space
@@ -186,7 +184,6 @@ void initWord(char *word, int firstWordLength, int length){
 
 /*
 This function sends the character input from the client to the server
-
 char socketId: socket identifier for the server
 char letter: character the client has input
 Returns: Void.
@@ -203,7 +200,6 @@ void sendGuess(int socketId, char letter){
 /*
 Prints the client's current word as well as the number of guesses left 
 	and the characters already guessed by the client
-
 char *word: the client's current word
 char *alreadyGuessed: the array that stores all of the client's guesses
 int length: total length of the words
@@ -238,7 +234,6 @@ void printWordInfo(char *word, char *alreadyGuessed, int length, int guessedInde
 
 /*
 Sends the current status fo the game to the server
-
 char socketId: socket identifier for the server
 char status: value based on win/lose condition
 Returns: Void.
@@ -253,7 +248,6 @@ void sendGameStatus(int socketId, int status){
 
 /*
 Prints to the console based on Win/Lose condition
-
 int completetionType: win/lose value
 char *username: name of the user
 Returns: Void.
@@ -270,7 +264,6 @@ void gameStatusPrint(int completionType, char *username){
 
 /*
 Prints client menu values to console (to clean up main)
-
 int menuType: value that decides what lines to print
 Returns: Void.
 */
@@ -280,7 +273,7 @@ void printMenu(int menuType) {
 		printf("Welcome to the Online Hangman Gaming System\n\n");
 		printf("=============================================\n\n");
 		printf("You are required to logon with your Username and Password\n\n");
-		printf("Username -->");
+		printf("Username --> ");
 	} else if (menuType == NOT_AUTHORISED){
 		printf("\n\nYou Entered Either an Incorrect Username or Password - Disconnecting\n");
 	} else if(menuType == MAIN_MENU){
@@ -296,7 +289,6 @@ void printMenu(int menuType) {
 
 /*
 Sends the username and password to the server
-
 char socketId: socket identifier for the server
 char *username: username credential input by the client
 char *password: password credential input by the client
@@ -309,7 +301,6 @@ void sendCredentials(int socketId, char *username, char *password){
 
 /*
 Retrieves the result of the authorisation attempt by the client
-
 char socketId: socket identifier for the server
 Returns: int value for authorisation result
 */
@@ -366,7 +357,7 @@ int main(int argc, char *argv[]) {
 	char burner[16];
 	printMenu(START_MENU);
 	scanf("%s", username);
-	printf("Password -->");
+	printf("Password --> ");
 	scanf("%s", password);
 	send(sockfd, &username, MAXDATASIZE, 0);
 	send(sockfd, &password, MAXDATASIZE, 0);
@@ -377,13 +368,13 @@ int main(int argc, char *argv[]) {
 	}
 	
 	
-	while(value != 3 && authorisation){
+	while(value != EXIT && authorisation){
 		printMenu(MAIN_MENU);
 		scanf("%d", &value);
 		printf("\n\n");
-		Send_Array_Data(sockfd, value);
+		sendCommand(sockfd, value);
 		
-		if(value == 1){
+		if(value == HANGMAN){
 			receiveWordInformation(sockfd, wordInformation);
 			currentGuesses = 0;
 			
@@ -430,7 +421,7 @@ int main(int argc, char *argv[]) {
 			free(word);
 			free(wordPosition);
 			
-		} else if (value == 2){
+		} else if (value == LEADERBOARD){
 			receivePrintLeaderboard(sockfd);
 		}		
 	}
@@ -438,4 +429,3 @@ int main(int argc, char *argv[]) {
 
 	return 0;
 }
-

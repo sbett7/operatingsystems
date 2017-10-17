@@ -9,6 +9,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#define GAME_LOST 1
+#define GAME_WON 2
+#define WON_GAME 1
+#define LOST_GAME 0
 
 #define MAX_CONNECTIONS 10
 #define NO_PENDING_CONNECTIONS 0
@@ -86,23 +90,25 @@ void hangmanGame(int socketId, Client *client){
 	free(wordInformation);
 	
 	//play the game until the client has sent back a finished command
-	while(guess != GAME_WON || guess != GAME_LOST){
+	while(1){
 		guess = getClientGuess(socketId);
 		if(guess <= LETTER_Z && guess >= LETTER_A){
 			getLetterLocations(client, guess);
 			sendLetterPositions(socketId, client);
 			resetLetterLocations(client);
 		}
+		if(guess == GAME_WON || guess == GAME_LOST){
+			break;
+		}
 	}
 	
-	//
 	if(guess == GAME_WON){
 		wonGame = WON_GAME;
 	}
 	
 	//START CRITICAL SECTION - functions located in ClientLeaderboardFunctions.c
 	leaderboardWriteLock(); 
-	updateLeaderboardWithClient(client->username, wonGame);
+	updateLeaderboardWithClient(client->clientId, wonGame);
 	leaderboardWriteUnlock();
 	//END CRITICAL SECTION
 }
@@ -233,7 +239,9 @@ void handleConnection(int socketId){
 
 		//if no client present, register new client credentials
 		if(clientIndex == NO_CLIENT_LISTED){
+			leaderboardWriteLock();
 			clientIndex = addClient(username);
+			leaderboardWriteUnlock();
 			printf("Client Index: %d\n", clientIndex);
 		}
 		

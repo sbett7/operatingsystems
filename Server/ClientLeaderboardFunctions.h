@@ -80,9 +80,11 @@ int compareClientGamesPercentage(Client *clientOne, Client *clientTwo);
 
 int compareClientGamesWon(Client *clientOne, Client *clientTwo);
 
-void updateLeaderboardWithClient(char *username, int gameWon);
+void updateLeaderboardWithClient(int clientId, int gameWon);
 
 int getClientIndexByUsername(char *username);
+
+int getClientIndexById(int clientId);
 
 int getNumberOfPlayersOnLeaderboard();
 

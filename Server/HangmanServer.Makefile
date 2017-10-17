@@ -4,11 +4,11 @@ LDFLAGS = -pthread
 
 all: HangmanServer
 
-HangmanServer: HangmanServer.o TextProcessor.o ClientLeaderboardFunctions.o Communication.o
+HangmanServer: HangmanServer.o TextProcessor.o ClientLeaderboardFunctions.o ServerCommunication.o
 
 ClientLeaderboardFunctions.o: ClientLeaderboardFunctions.c
 
-Communication.o: Communication.c
+ServerCommunication.o: ServerCommunication.c
 
 TextProcessor.o: TextProcessor.c
 

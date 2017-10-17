@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 #include "TextProcessor.h"
 #include "ClientLeaderboardFunctions.h"
-#include "Communication.h"
+#include "ServerCommunication.h"
 
 #include <stdio.h>       /* standard I/O routines                     */
 #include <pthread.h>     /* pthread functions and data structures     */

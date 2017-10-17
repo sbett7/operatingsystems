@@ -20,10 +20,6 @@
 #include "TextProcessor.h"
 #include "ClientLeaderboardFunctions.h"
 
-#define GAME_LOST 1
-#define GAME_WON 2
-#define WON_GAME 1
-#define LOST_GAME 0
 #define MAX_DATA_SIZE 100 
 
 #define SPACE 0

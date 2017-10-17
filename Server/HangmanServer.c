@@ -39,6 +39,7 @@
 pthread_t  clientThreads[MAX_CONNECTIONS];
 
 pthread_mutex_t connectionMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_mutex_t activeConnectionMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_cond_t  gotConnection   = PTHREAD_COND_INITIALIZER;
 
 /* Linked List that contains waiting connections */
@@ -162,7 +163,6 @@ void addConnection(int socketId, pthread_mutex_t *pMutex, pthread_cond_t *pCondV
 		fprintf(stderr, "AddConnection: out of memory\n");
 		exit(1);
 	}
-	
 	clientConnection->socketId = socketId;
 	clientConnection->next = NULL;
 	
@@ -182,7 +182,6 @@ void addConnection(int socketId, pthread_mutex_t *pMutex, pthread_cond_t *pCondV
 	rc = pthread_mutex_unlock(pMutex);
 	rc = pthread_cond_signal(pCondVar);
 	//END CRITICAL SECTION
-	
 }
 
 /*
@@ -266,15 +265,20 @@ Returns: Void.
 void* threadConnectionHandler(void* data){
 	struct connection *clientConnection;
 	rc = pthread_mutex_lock(&connectionMutex);
-	int threadId = *(int*)data;
+	int threadId = *((int*)data);
+
 	while(1){
 		if(numConnections > 0){
+
 			clientConnection = getConnection(&connectionMutex);
 
 			if(clientConnection){
+				pthread_mutex_lock(&activeConnectionMutex);
 				numActiveConnections++;
-		
-				threads[threadId].socketId = clientConnection->socketId;		
+				pthread_mutex_unlock(&activeConnectionMutex);
+
+				threads[threadId].socketId = clientConnection->socketId;
+						
 				rc = pthread_mutex_unlock(&connectionMutex);
 				handleConnection(clientConnection->socketId);
 				close(clientConnection->socketId);
@@ -282,7 +286,9 @@ void* threadConnectionHandler(void* data){
 				rc = pthread_mutex_lock(&connectionMutex);
 				threads[threadId].socketId = NO_ACTIVE_CONNECTION;
 				
+				pthread_mutex_lock(&activeConnectionMutex);
 				numActiveConnections--;
+				pthread_mutex_unlock(&activeConnectionMutex);
 			}
 		} else{
 			rc = pthread_cond_wait(&gotConnection, &connectionMutex);
@@ -295,10 +301,14 @@ This function creates new threads and provides them with a thread id.
 	It also initialises the thread connections struct to have no active connections.
 Returns: Void.
 */
-void createThreads(){ 	
+void createThreads(){
+		
 	for(int i = 0; i < MAX_CONNECTIONS; i++){
-		pthread_create(&clientThreads[i], NULL, threadConnectionHandler, (void*)&i);
+		threads[i].threadId = i;
 		threads[i].socketId = NO_ACTIVE_CONNECTION;
+		pthread_create(&clientThreads[i], NULL, threadConnectionHandler, (void*)&threads[i].threadId);
+		
+		
 	}
 }
 
@@ -342,7 +352,7 @@ void endProgramHandler() {
 	clearClients();
 	clearWords();	
 	clearAccounts();
-	
+
 	printf("Goodbye!\n");
 	exit(0);
 }
@@ -365,10 +375,15 @@ void initialiseHangmanObjects(){
 	clients = malloc(sizeof(Client));
 	threads = malloc(MAX_CONNECTIONS * sizeof(struct thread));
 	numClients = 0;
+	numActiveConnections = 0;
+	numConnections = 0;
 
 	//read in credentials and words from text file
 	storeCredentials();
 	readInWords();
+	
+	//initialise random number generator
+	initialiseRandomNumberGenerator();
 	
 	createThreads();
 }

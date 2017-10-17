@@ -231,4 +231,35 @@ void clearAccounts(){
 	free(accounts);
 }
 
+/*
+This function checks if two char arrays are equal.
+char *stringOne: a pointer to a char array of the first string
+char *stringTwo: a pointer to a char array of the second string.
+int lengthOne: an integer that contains the length of stringOne.
+int lengthOne: an integer that contains the length of stringTwo.
+Returns: An integer that is 1(TRUE) if the strings are equal, else 0(FALSE).
+*/
+int checkStringsEqual(char *stringOne, char *stringTwo, int lengthOne, int lengthTwo){
+	
+	if(lengthOne != lengthTwo){
+		return FALSE;
+	}
+	
+	for (int i = 0; i < lengthOne; i++){
+		if(stringOne[i] != stringTwo[i]){
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+/*
+This function sets the seed of the random number generator based on the current time.
+	This ensures that the sequence of random numbers is different each time that
+	the program is started.
+*/
+void initialiseRandomNumberGenerator(){
+	srand(time(NULL));
+}
 

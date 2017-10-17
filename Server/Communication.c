@@ -76,7 +76,6 @@ Returns: The client's guess in char format.
 char getClientGuess(int socketId){
 	char guess;
 	uint16_t value;	
-
 	recv(socketId, &value, sizeof(uint16_t), 0);
 	guess = (char)ntohs(value);
 	return guess;

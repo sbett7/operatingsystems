@@ -89,6 +89,8 @@ int checkCredentials(char *username, char *password, int length);
 
 void clearAccounts();
 
+void initialiseRandomNumberGenerator();
+
 
 
 

@@ -75,30 +75,6 @@ void initialiseClientWords(Client *client, int length){
 }
 
 /*
-This function checks if two char arrays are equal.
-char *stringOne: a pointer to a char array of the first string
-char *stringTwo: a pointer to a char array of the second string.
-int lengthOne: an integer that contains the length of stringOne.
-int lengthOne: an integer that contains the length of stringTwo.
-Returns: An integer that is 1(TRUE) if the strings are equal, else 0(FALSE).
-*/
-int checkStringsEqual(char *stringOne, char *stringTwo, int lengthOne, int lengthTwo){
-	printf("%d %d\n", lengthOne, lengthTwo);
-	
-	if(lengthOne != lengthTwo){
-		return FALSE;
-	}
-	
-	for (int i = 0; i < lengthOne; i++){
-		if(stringOne[i] != stringTwo[i]){
-			return FALSE;
-		}
-	}
-
-	return TRUE;
-}
-
-/*
 This function checks which of the two given clients has won the most games.
 Client *clientOne: a pointer to the first client to compare.
 Client *clientTwo: a pointer to the client to compare the first client against.

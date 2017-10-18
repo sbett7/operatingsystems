@@ -45,16 +45,24 @@ struct _client{
 	int *lastWord;
 	int lastLength;
 	int maxGuess;
-	int gamesPlayed;
-	int gamesWon;
-	float percentage;
-
-}_clients, temp;
+};
 
 typedef struct _client Client;
 
+// the leaderboard structure
+struct _leaderboard{
+	int clientId;
+	char *username;
+	int gamesPlayed;
+	int gamesWon;
+	float percentage;
+} temp;
+
+typedef struct _leaderboard Leaderboard;
+
 // houses all clients, and acts as the leaderboard
 Client *clients;
+Leaderboard *leaderboard;
 
 int numClients;
 int readerCounter;
@@ -74,13 +82,13 @@ void getLeaderBoardClient(char *userString, int clientId);
 
 void orderLeaderboard();
 
-int compareClients(Client *clientOne, Client *clientTwo);
+int compareClients(Leaderboard *clientOne, Leaderboard *clientTwo);
 
-int compareClientGamesPercentage(Client *clientOne, Client *clientTwo);
+int compareClientGamesPercentage(Leaderboard *clientOne, Leaderboard *clientTwo);
 
-int compareClientGamesWon(Client *clientOne, Client *clientTwo);
+int compareClientGamesWon(Leaderboard *clientOne, Leaderboard *clientTwo);
 
-void updateLeaderboardWithClient(int clientId, int gameWon);
+void updateLeaderboard(int clientId, int gameWon);
 
 int getClientIndexByUsername(char *username);
 
@@ -107,5 +115,7 @@ void initialiseClientWords(Client *client, int length);
 void resetLetterLocations(Client *client);
 
 void getLetterLocations(Client *client, char letter);
+
+void addClientToLeaderBoard(Client *client, int index);
 
 #endif

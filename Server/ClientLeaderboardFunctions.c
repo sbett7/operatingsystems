@@ -53,11 +53,10 @@ Returns: Void.
 */
 void initialiseClient(Client *client, char *username){
 	client->clientId = numClients;
-	printf("A new client has been registed with the following clientID: %d\n", client->clientId);
 	client->username = malloc(sizeof(username));
 	strcpy(client->username, username);
-	client->gamesPlayed = 0;
-	client->gamesWon = 0;
+
+	printf("User %s has been registed with the following client ID: %d\n\n", client->username, client->clientId);
 }
 
 /*
@@ -73,6 +72,8 @@ void initialiseClientWords(Client *client, int length){
 	client->firstWord = calloc(client->firstLength, sizeof(int));
 	client->lastWord = calloc(client->lastLength, sizeof(int));
 	client->maxGuess = words[client->wordId].maxGuess;
+
+	printf("%s has been assigned the word with an ID of %d\n\n", client->username, client->wordId);
 }
 
 /*
@@ -82,10 +83,10 @@ Client *clientTwo: a pointer to the client to compare the first client against.
 Returns: An integer that specifies whether clientOne or clientTwo has won the most
 	games.  Or it will return the result for a draw if they are both equal.
 */
-int compareClientGamesWon(Client *clientOne, Client *clientTwo){
-	if(clientOne->gamesWon > clientTwo->gamesWon){
+int compareClientGamesWon(Leaderboard *clientOne, Leaderboard *clientTwo){
+	if(clientOne->gamesWon < clientTwo->gamesWon){
 		return CLIENT_TWO;
-	} else if (clientOne->gamesWon < clientTwo->gamesWon){
+	} else if (clientOne->gamesWon > clientTwo->gamesWon){
 		return CLIENT_ONE;
 	} else {
 		return DRAW;
@@ -99,10 +100,10 @@ Client *clientTwo: a pointer to the client to compare the first client against.
 Returns: An integer that specifies whether clientOne or clientTwo has a higher game
 	percentage.  Or it will return the result for a draw if they are both equal.
 */
-int compareClientGamesPercentage(Client *clientOne, Client *clientTwo){
-	if(clientOne->percentage > clientTwo->percentage){
+int compareClientGamesPercentage(Leaderboard *clientOne, Leaderboard *clientTwo){
+	if(clientOne->percentage < clientTwo->percentage){
 		return CLIENT_TWO;
-	} else if (clientOne->percentage < clientTwo->percentage){
+	} else if (clientOne->percentage > clientTwo->percentage){
 		return CLIENT_ONE;
 	} else {
 		return DRAW;
@@ -117,9 +118,9 @@ Client *clientTwo: a pointer to the client to compare the first client against.
 Returns: An integer that specifies whether clientOne or clientTwo comes first in the
 	alphabet.
 */
-int compareClientNames(Client *clientOne, Client *clientTwo){
+int compareClientNames(Leaderboard *clientOne, Leaderboard *clientTwo){
 	int compareResult = strcmp(clientOne->username, clientTwo->username);	
-	if(compareResult < 0){
+	if(compareResult > 0){
 		return CLIENT_TWO;
 	} else {
 		return CLIENT_ONE;
@@ -132,11 +133,11 @@ Client *clientOne: a pointer to the first client to compare.
 Client *clientTwo: a pointer to the client to compare the first client against.
 Returns: An integer that states whether clientOne is above clientTwo on the leaderboard.
 */
-int compareClients(Client *clientOne, Client *clientTwo){
+int compareClients(Leaderboard *clientOne, Leaderboard *clientTwo){
 	int compareResult = 0;
 
 	//compare by games won
-	compareResult= compareClientGamesWon(clientOne, clientTwo);
+	compareResult = compareClientGamesWon(clientOne, clientTwo);
 
 	if(compareResult == DRAW){ //if drawn, check game percentage
 		compareResult = compareClientGamesPercentage(clientOne, clientTwo);
@@ -158,10 +159,10 @@ void orderLeaderboard(){
 	for (int i = 1; i < numClients; i++){
 		for (int j = 0; j < numClients - i; j++){
 			//if the next client is ranked higher than the current, switch the client positions
-			if(compareClients(&clients[j], &clients[j+1]) == CLIENT_TWO){
-				temp = clients[j];
-				clients[j] = clients[j+1];
-				clients[j+1] = temp;
+			if(compareClients(&leaderboard[j], &leaderboard[j+1]) == CLIENT_ONE){
+				temp = leaderboard[j];
+				leaderboard[j] = leaderboard[j+1];
+				leaderboard[j+1] = temp;
 			}	
 		}
 		
@@ -175,7 +176,7 @@ Returns: An integer with the number of players that have played at least one gam
 int getNumberOfPlayersOnLeaderboard(){
 	int players = 0;
 	for(int i = 0; i < numClients; i++){
-		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
+		if(leaderboard[i].gamesPlayed != NO_GAMES_PLAYED){
 			players++;
 		}
 	}
@@ -201,14 +202,14 @@ void sendClientLeaderboard(int socketId){
 	send(socketId, &numClientsSent, sizeof(uint16_t), 0);
 	printf("Number of Clients on the Leader Board: %d\n", numPlayersOnboard);
 	for(int i = 0; i < numClients; i++){
-		if(clients[i].gamesPlayed != NO_GAMES_PLAYED){
-			messageSizeSent = htons(strlen(clients[i].username));
+		if(leaderboard[i].gamesPlayed != NO_GAMES_PLAYED){
+			messageSizeSent = htons(strlen(leaderboard[i].username));
 			send(socketId, &messageSizeSent, sizeof(uint16_t), 0);
-			send(socketId, clients[i].username, strlen(clients[i].username), 0);
+			send(socketId, leaderboard[i].username, strlen(leaderboard[i].username), 0);
 			
-			clientValue = htons(clients[i].gamesPlayed);
+			clientValue = htons(leaderboard[i].gamesPlayed);
 			send(socketId, &clientValue, sizeof(uint16_t), 0);
-			clientValue = htons(clients[i].gamesWon);
+			clientValue = htons(leaderboard[i].gamesWon);
 			send(socketId, &clientValue, sizeof(uint16_t), 0);
 		}
 	}
@@ -228,12 +229,34 @@ int addClient(char *username){
 	}
 
 	initialiseClient(&clients[numClients-1], username);
+	addClientToLeaderBoard(&clients[numClients-1], numClients-1);
 	return numClients - 1;
 }
 
 /*
-This function will get the index of a client based upon the given username. If no client with that
-	username is found, -1 will be returned.
+This function adds a new client to the leaderboard struct array with the specified client details.
+	This will reallocate the array if more than one client is already present within
+	the array.
+Client *client: a pointer to a client that is to be used to create the new entry in the leaderboard.
+Returns: void
+*/
+void addClientToLeaderBoard(Client *client, int index){
+	if (numClients > 0){
+		leaderboard = realloc(leaderboard, sizeof(Leaderboard) * (numClients));
+	}
+	leaderboard[index].clientId = client->clientId;
+	
+	leaderboard[index].username = malloc(sizeof(client->username));
+	strcpy(leaderboard[index].username, client->username);
+	leaderboard[index].gamesPlayed = 0;
+	leaderboard[index].gamesWon = 0;
+	leaderboard[index].percentage = 0;
+
+}
+
+/*
+This function will get the index of a client within the clients data structure based 
+	upon the given username. If no client with that username is found, -1 will be returned.
 char *username: a pointer to a char array for the username that is to be used for the client that is
 	to be found.
 Returns: an integer that specifies the client index of the client with that username.  If no client
@@ -251,16 +274,16 @@ int getClientIndexByUsername(char *username){
 }
 
 /*
-This function will get the index of a client based upon the given client ID. If no client with that
-	ID is found, -1 will be returned.
+This function will get the index of a client in the leaderboard data structure based 
+	upon the given client ID. If no client with that ID is found, -1 will be returned.
 int clientId: an integer containing the ID that is to be found.
-Returns: an integer that specifies the client index of the client with that username.  If no client
+Returns: an integer that specifies the leaderboard index of the client with that client ID.  If no client
 	with that username is found, -1 is returned.
 */
 int getClientIndexByClientId(int clientId){
-	if(clients != NULL){
+	if(leaderboard != NULL){
 		for(int i = 0; i < numClients; i++){
-			if(clients[i].clientId == clientId){
+			if(leaderboard[i].clientId == clientId){
 				return i;
 			}
 		}
@@ -276,11 +299,11 @@ char *username: a pointer to a char array for the username that is to be used fo
 int gamesWon: an integer that contains the number of gamesWon by the user.  This value is either 1 or 0.
 Returns: void.
 */
-void updateLeaderboardWithClient(int clientId, int gameWon){
+void updateLeaderboard(int clientId, int gameWon){
 	int clientIndex = getClientIndexByClientId(clientId);
 
-	clients[clientIndex].gamesPlayed++;
-	clients[clientIndex].gamesWon += gameWon;
+	leaderboard[clientIndex].gamesPlayed++;
+	leaderboard[clientIndex].gamesWon += gameWon;
 
 	orderLeaderboard(); 
 }
@@ -292,12 +315,14 @@ Returns: void.
 void clearClients(){
 	for(int i = 0; i < numClients; i++){
 		free(clients[i].username);
+		free(leaderboard[i].username);
 		//if a word has been given to this client, free it.
 		if(clients[i].firstWord != NULL){
 			free(clients[i].firstWord);
 			free(clients[i].lastWord);
 		}
 	}
+	free(leaderboard);
 	free(clients);
 }
 

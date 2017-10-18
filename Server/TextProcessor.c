@@ -83,7 +83,7 @@ int readInWords(){
 	if(fp == NULL){
 		return -1;
 	}
-	
+
 	while(fgets(str, sizeof(str), fp) != NULL){
 		
 		//get words
@@ -103,7 +103,7 @@ int readInWords(){
 
 		//calculate maximum guesses for this entry
 		words[i].maxGuess = getMaxGuesses(words[i].firstLength, words[i].lastLength);
-
+		printf("Word %d: %s %s\n", i + 1, words[i].firstWord, words[i].lastWord);
 		i++; //increment counter
 		
 	}

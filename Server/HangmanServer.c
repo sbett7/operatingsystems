@@ -36,6 +36,8 @@
 #define NO_CLIENT_LISTED -1
 #define PARAMETER_GIVEN 2
 
+#define WORD_INFORMATION_ARRAY_SIZE 3
+
 pthread_t  clientThreads[MAX_CONNECTIONS];
 
 pthread_mutex_t connectionMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -76,7 +78,7 @@ Client *client: a pointer to a Client struct that contains all of the
 Returns: Void
 */
 void hangmanGame(int socketId, Client *client){
-	int *wordInformation = malloc(3 * sizeof(int));
+	int wordInformation[WORD_INFORMATION_ARRAY_SIZE];
 	char guess;
 	int wonGame = LOST_GAME;
 
@@ -88,7 +90,6 @@ void hangmanGame(int socketId, Client *client){
 	
 	//send word information to the client
 	sendWordDetails(socketId, wordInformation);
-	free(wordInformation);
 	
 	//play the game until the client has sent back a finished command
 	while(1){
@@ -109,7 +110,9 @@ void hangmanGame(int socketId, Client *client){
 	
 	//START CRITICAL SECTION - functions located in ClientLeaderboardFunctions.c
 	leaderboardWriteLock(); 
-	updateLeaderboardWithClient(client->clientId, wonGame);
+	printf("%s has finished playing Hangman.\nThe Leader Board is being updated.\n\n", client->username);
+	updateLeaderboard(client->clientId, wonGame);
+	printf("The Leader Board has finished updating\n");
 	leaderboardWriteUnlock();
 	//END CRITICAL SECTION
 }
@@ -137,7 +140,7 @@ void performCommand(int command, int socketId, Client *client){
 			//END CRITICAL SECTION
 			break;
 		case EXIT:
-			printf("closing connection");
+			printf("Closing connection for user: %s\n\n", client->username);
 			close(socketId);
 			break;
 	}
@@ -226,6 +229,7 @@ void handleConnection(int socketId){
 	char *password = malloc(MAX_DATA_SIZE * sizeof(char));
 	int clientIndex = 0;
 	
+	printf("\nRequesting credentials from the new client connection with socket: %d\n\n", socketId);
 	//get and authenticate credentials, and return result to client
 	getUserCredentials(socketId, username, password);
 	accountVerified = checkCredentials(username, password, numAccounts);
@@ -233,12 +237,13 @@ void handleConnection(int socketId){
 	
 	//if authenticated, get client information/register new client
 	if(accountVerified == TRUE){
-
+		printf("Client %d has been successfully authenticated as the user: %s\n", socketId, username);
 		clientIndex = getClientIndexByUsername(username);
-
+		
 		//if no client present, register new client credentials
 		if(clientIndex == NO_CLIENT_LISTED){
 			leaderboardWriteLock();
+			printf("Adding a new user account to the Leader Board\n");
 			clientIndex = addClient(username);
 			leaderboardWriteUnlock();
 		}
@@ -345,7 +350,7 @@ This function is the event handler for the SIGINT interrupt.  It will perform
 Returns: Void.
 */
 void endProgramHandler() {
-	printf("\nShutting Down Server...\n");
+	printf("\n\nShutting Down Server...\n");
 	clearThreads();
 	clearConnections();
 	clearClients();
@@ -372,16 +377,22 @@ void initialiseHangmanObjects(){
 	words = malloc(numWords * sizeof(Word));
 	accounts = malloc(numAccounts * sizeof(Account));
 	clients = malloc(sizeof(Client));
+	leaderboard = malloc(sizeof(Leaderboard));
 	threads = malloc(MAX_CONNECTIONS * sizeof(struct thread));
 	numClients = 0;
 	numActiveConnections = 0;
 	numConnections = 0;
 
 	//read in credentials and words from text file
+	printf("Storing authorised user credentials\n\n");
 	storeCredentials();
+
+	printf("Storing Hangman words\nThe words are: \n\n");
 	readInWords();
+	printf("\n\nFinished storing Hangman words!\n\n");
 	
 	//initialise random number generator
+	printf("Initialising Hangman random word generator\n\n\n");
 	initialiseRandomNumberGenerator();
 	
 	createThreads();
@@ -398,6 +409,7 @@ int main(int argc, char *argv[]){
 	initialiseHangmanObjects();
 	
 
+	printf("Constructing Server Communication Objects\n\n");
 	//set default socket if no socket was provided 
 	if (argc != PARAMETER_GIVEN) {
 		serverSocket = DEFAULT_SOCKET;

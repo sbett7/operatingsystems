@@ -208,7 +208,7 @@ int checkCredentials(char *username, char *password, int length){
 	int accountUserLength;
 	int accountPassLength;
 	
-	for(int i = 0; i < length - 1; i++){
+	for(int i = 0; i < length; i++){
 		accountUserLength = getWordLength(accounts[i].username);
 		accountPassLength = getWordLength(accounts[i].password);
 

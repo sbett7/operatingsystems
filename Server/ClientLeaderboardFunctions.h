@@ -118,4 +118,6 @@ void getLetterLocations(Client *client, char letter);
 
 void addClientToLeaderBoard(Client *client, int index);
 
+int checkClientGamesPlayed(Leaderboard *clientOne, Leaderboard *clientTwo);
+
 #endif

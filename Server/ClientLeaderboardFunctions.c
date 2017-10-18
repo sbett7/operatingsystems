@@ -101,9 +101,31 @@ Returns: An integer that specifies whether clientOne or clientTwo has a higher g
 	percentage.  Or it will return the result for a draw if they are both equal.
 */
 int compareClientGamesPercentage(Leaderboard *clientOne, Leaderboard *clientTwo){
-	if(clientOne->percentage < clientTwo->percentage){
+	if(clientOne->gamesWon != 0 && clientTwo->gamesWon != 0){
+		if(clientOne->percentage < clientTwo->percentage){
+			return CLIENT_TWO;
+		} else if (clientOne->percentage > clientTwo->percentage){
+			return CLIENT_ONE;
+		} else {
+			return DRAW;
+		}
+	} else {
+		return checkClientGamesPlayed(clientOne, clientTwo);
+	}
+	
+}
+
+/*
+This function checks which of the two given clients has a higher number of games played.
+Client *clientOne: a pointer to the first client to compare.
+Client *clientTwo: a pointer to the client to compare the first client against.
+Returns: An integer that specifies whether clientOne or clientTwo has a higher game
+	percentage.  Or it will return the result for a draw if they are both equal.
+*/
+int checkClientGamesPlayed(Leaderboard *clientOne, Leaderboard *clientTwo){
+	if(clientOne->gamesPlayed > clientTwo->gamesPlayed){
 		return CLIENT_TWO;
-	} else if (clientOne->percentage > clientTwo->percentage){
+	} else if(clientOne->gamesPlayed < clientTwo->gamesPlayed){
 		return CLIENT_ONE;
 	} else {
 		return DRAW;
@@ -304,6 +326,7 @@ void updateLeaderboard(int clientId, int gameWon){
 
 	leaderboard[clientIndex].gamesPlayed++;
 	leaderboard[clientIndex].gamesWon += gameWon;
+	leaderboard[clientIndex].percentage = (float)leaderboard[clientIndex].gamesWon/(float)leaderboard[clientIndex].gamesPlayed;
 
 	orderLeaderboard(); 
 }

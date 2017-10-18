@@ -338,7 +338,6 @@ Returns: void.
 void clearClients(){
 	for(int i = 0; i < numClients; i++){
 		free(clients[i].username);
-		free(leaderboard[i].username);
 		//if a word has been given to this client, free it.
 		if(clients[i].firstWord != NULL){
 			free(clients[i].firstWord);

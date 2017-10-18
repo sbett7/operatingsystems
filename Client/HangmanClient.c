@@ -273,7 +273,7 @@ void playHangmanGame(){
 	setWordDataSize(length, wordInformation[MAX_GUESSES]);	
 	initWord(word, wordInformation[FIRST_LENGTH], length);
 
-	fgets(burner, INPUT_BUFFER_SIZE, stdin);
+	fgets(burner, INPUT_BUFFER_SIZE, stdin); //clears potential leftover input for clean user input
 	
 	while(currentGuesses != wordInformation[MAX_GUESSES] && !checkWordIsDone(word, length)){
 		printWordInfo(word, guessedLetters, length, currentGuesses, wordInformation[MAX_GUESSES], incorrectInput);
@@ -302,12 +302,22 @@ void playHangmanGame(){
 /*
 Prompts the user for the command that they wish to perform and sends it to
 	the server.
-Returns: An integer with the command type.
+Returns: An integer with a valid command type.
 */
 int getCommand(){
 	int command = 0;
+	int acceptedCommand = FALSE;
+	char burner;
 	printMenu(MAIN_MENU);
-	scanf("%d", &command);
+	do{
+		scanf("%d", &command);
+		if (command == HANGMAN || command == LEADERBOARD || command == EXIT){
+			acceptedCommand = TRUE;
+		 }else {
+			printf("*Command not accepted*\nPlease Enter 1, 2 or 3 only --> ");
+			scanf("%c", &burner);
+		 }
+	} while (!acceptedCommand);
 	printf("\n\n");
 	sendCommand(socketId, command);
 	return command;
